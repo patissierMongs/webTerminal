@@ -1,4 +1,4 @@
-const CACHE_NAME = 'openclaw-terminal-v3';
+const CACHE_NAME = 'openclaw-terminal-v4';
 const PRECACHE = [
   '/',
   '/style.css',
