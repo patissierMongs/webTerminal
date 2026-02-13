@@ -292,6 +292,79 @@ body {
   white-space: nowrap;
 }
 
+/* Custom Keyboard (PWA only) */
+.mobile-kbd {
+  display: flex;
+  flex-direction: column;
+  background: var(--bar-bg);
+  flex-shrink: 0;
+  padding: 2px;
+  gap: 2px;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.mobile-kbd.hidden {
+  display: none;
+}
+
+.kbd-row {
+  display: flex;
+  gap: 2px;
+  justify-content: center;
+}
+
+.kbd-key {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 34px;
+  min-width: 0;
+  flex: 1;
+  background: #1e2238;
+  color: var(--text);
+  border: none;
+  border-radius: 3px;
+  font-size: 11px;
+  font-family: 'FiraCode Nerd Font', monospace;
+  cursor: pointer;
+  touch-action: manipulation;
+  padding: 0 1px;
+}
+
+.kbd-key:active {
+  background: var(--accent);
+}
+
+.kbd-key.active {
+  background: var(--green);
+  color: #111;
+}
+
+.kbd-fn-key {
+  height: 28px;
+  background: #161830;
+  font-size: 10px;
+}
+
+.kbd-fn-key:active {
+  background: var(--accent);
+}
+
+.kbd-fn-key.active {
+  background: var(--green);
+  color: #111;
+}
+
+.kbd-space {
+  flex: 5;
+}
+
+.kbd-key.w15 { flex: 1.5; }
+.kbd-key.w175 { flex: 1.75; }
+.kbd-key.w2 { flex: 2; }
+.kbd-key.w225 { flex: 2.25; }
+
 /* Mobile tweaks */
 @media (max-width: 600px) {
   .monitor { display: none; }
