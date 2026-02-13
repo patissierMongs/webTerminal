@@ -2,6 +2,15 @@
 (function () {
   'use strict';
 
+  // --- PWA Detection ---
+  function isPWA() {
+    return window.matchMedia('(display-mode: fullscreen)').matches ||
+           window.matchMedia('(display-mode: standalone)').matches ||
+           navigator.standalone === true;
+  }
+
+  const deviceType = isPWA() ? 'pwa' : 'browser';
+
   // --- Terminal Setup ---
   const term = new Terminal({
     cursorBlink: true,
@@ -43,6 +52,19 @@
 
   socket.on('connect', () => {
     setStatus('connected', 'Connected');
+    socket.emit('register', { deviceType });
+  });
+
+  socket.on('pty-dimensions', ({ cols, rows }) => {
+    if (deviceType === 'pwa') {
+      term.resize(cols, rows);
+      fitAddon.fit();
+    }
+  });
+
+  socket.on('client-count', (count) => {
+    const el = document.getElementById('client-count');
+    if (el) el.textContent = count;
   });
 
   socket.on('disconnect', () => {
@@ -97,11 +119,11 @@
     }
   }
 
-  window.addEventListener('resize', doResize);
-  window.addEventListener('orientationchange', () => setTimeout(doResize, 200));
-
-  // Initial resize after a tick
-  setTimeout(doResize, 100);
+  if (deviceType !== 'pwa') {
+    window.addEventListener('resize', doResize);
+    window.addEventListener('orientationchange', () => setTimeout(doResize, 200));
+    setTimeout(doResize, 100);
+  }
 
   // --- Modal ---
   const overlay = document.getElementById('modal-overlay');

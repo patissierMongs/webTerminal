@@ -75,21 +75,34 @@ app.get('/api/monitor', (_req, res) => {
 
 // --- Socket.IO ---
 
+function broadcastClientCount() {
+  io.emit('client-count', terminal.clients.size);
+}
+
 io.on('connection', (socket) => {
   console.log(`[io] client connected: ${socket.id}`);
-  terminal.addClient(socket);
+  terminal.addClient(socket, 'browser');
+  broadcastClientCount();
+
+  socket.on('register', ({ deviceType }) => {
+    if (deviceType === 'pwa' || deviceType === 'browser') {
+      terminal.registerDevice(socket, deviceType);
+      console.log(`[io] ${socket.id} registered as ${deviceType}`);
+    }
+  });
 
   socket.on('input', (data) => {
     terminal.write(data);
   });
 
   socket.on('resize', ({ cols, rows }) => {
-    terminal.resize(cols, rows);
+    terminal.resizeIfAllowed(socket, cols, rows);
   });
 
   socket.on('disconnect', () => {
     console.log(`[io] client disconnected: ${socket.id}`);
     terminal.removeClient(socket);
+    broadcastClientCount();
   });
 });
 
