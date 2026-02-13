@@ -480,6 +480,24 @@ body {
 .kbd-key.w2 { flex: 2; }
 .kbd-key.w225 { flex: 2.25; }
 
+/* IME Indicator */
+.ime-indicator {
+  background: #161830;
+  color: var(--green);
+  font-size: 14px;
+  text-align: center;
+  height: 0;
+  line-height: 20px;
+  overflow: hidden;
+  font-family: 'FiraCode Nerd Font', monospace;
+  flex-shrink: 0;
+  transition: height 0.1s ease;
+}
+
+.ime-indicator.active {
+  height: 20px;
+}
+
 /* Mobile tweaks */
 @media (max-width: 600px) {
   .monitor { display: none; }

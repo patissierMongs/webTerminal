@@ -552,37 +552,127 @@
     kbdDiv.appendChild(buildRow(row5, false));
     kbdContainer.appendChild(kbdDiv);
 
+    // --- Korean IME (두벌식) ---
+    const CHO = 'ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ'.split('');
+    const JUNG = 'ㅏㅐㅑㅒㅓㅔㅕㅖㅗㅘㅙㅚㅛㅜㅝㅞㅟㅠㅡㅢㅣ'.split('');
+    const JONG = ['','ㄱ','ㄲ','ㄳ','ㄴ','ㄵ','ㄶ','ㄷ','ㄹ','ㄺ','ㄻ','ㄼ','ㄽ','ㄾ','ㄿ','ㅀ','ㅁ','ㅂ','ㅄ','ㅅ','ㅆ','ㅇ','ㅈ','ㅊ','ㅋ','ㅌ','ㅍ','ㅎ'];
+    const CV = {'ㅗㅏ':'ㅘ','ㅗㅐ':'ㅙ','ㅗㅣ':'ㅚ','ㅜㅓ':'ㅝ','ㅜㅔ':'ㅞ','ㅜㅣ':'ㅟ','ㅡㅣ':'ㅢ'};
+    const CJ = {'ㄱㅅ':'ㄳ','ㄴㅈ':'ㄵ','ㄴㅎ':'ㄶ','ㄹㄱ':'ㄺ','ㄹㅁ':'ㄻ','ㄹㅂ':'ㄼ','ㄹㅅ':'ㄽ','ㄹㅌ':'ㄾ','ㄹㅍ':'ㄿ','ㄹㅎ':'ㅀ','ㅂㅅ':'ㅄ'};
+    const SJ = {'ㄳ':['ㄱ','ㅅ'],'ㄵ':['ㄴ','ㅈ'],'ㄶ':['ㄴ','ㅎ'],'ㄺ':['ㄹ','ㄱ'],'ㄻ':['ㄹ','ㅁ'],'ㄼ':['ㄹ','ㅂ'],'ㄽ':['ㄹ','ㅅ'],'ㄾ':['ㄹ','ㅌ'],'ㄿ':['ㄹ','ㅍ'],'ㅀ':['ㄹ','ㅎ'],'ㅄ':['ㅂ','ㅅ']};
+    const SV = {'ㅘ':['ㅗ','ㅏ'],'ㅙ':['ㅗ','ㅐ'],'ㅚ':['ㅗ','ㅣ'],'ㅝ':['ㅜ','ㅓ'],'ㅞ':['ㅜ','ㅔ'],'ㅟ':['ㅜ','ㅣ'],'ㅢ':['ㅡ','ㅣ']};
+    const KO = {
+      'q':'ㅂ','Q':'ㅃ','w':'ㅈ','W':'ㅉ','e':'ㄷ','E':'ㄸ','r':'ㄱ','R':'ㄲ',
+      't':'ㅅ','T':'ㅆ','y':'ㅛ','u':'ㅕ','i':'ㅑ','o':'ㅐ','O':'ㅒ','p':'ㅔ','P':'ㅖ',
+      'a':'ㅁ','s':'ㄴ','d':'ㅇ','f':'ㄹ','g':'ㅎ',
+      'h':'ㅗ','j':'ㅓ','k':'ㅏ','l':'ㅣ',
+      'z':'ㅋ','x':'ㅌ','c':'ㅊ','v':'ㅍ',
+      'b':'ㅠ','n':'ㅜ','m':'ㅡ'
+    };
+
+    // Composition indicator
+    const imeBar = document.createElement('div');
+    imeBar.className = 'ime-indicator';
+    kbdDiv.insertBefore(imeBar, kbdDiv.firstChild);
+
+    const ime = {
+      cho: -1, jung: -1, jong: 0,
+      st: 'empty', has: false,
+
+      ch() {
+        if (this.cho >= 0 && this.jung >= 0)
+          return String.fromCharCode(0xAC00 + (this.cho * 21 + this.jung) * 28 + this.jong);
+        if (this.cho >= 0) return CHO[this.cho];
+        return '';
+      },
+
+      out(c) {
+        if (this.has) socket.emit('input', '\x7f' + c);
+        else socket.emit('input', c);
+        this.has = !!c;
+        imeBar.textContent = c;
+        imeBar.classList.toggle('active', !!c);
+      },
+
+      commit() {
+        if (this.st !== 'empty') {
+          this.has = false; this.st = 'empty';
+          this.cho = -1; this.jung = -1; this.jong = 0;
+          imeBar.textContent = ''; imeBar.classList.remove('active');
+        }
+      },
+
+      bksp() {
+        if (this.st === 'jong') {
+          const s = SJ[JONG[this.jong]];
+          if (s) { this.jong = JONG.indexOf(s[0]); }
+          else { this.jong = 0; this.st = 'jung'; }
+          this.out(this.ch());
+        } else if (this.st === 'jung') {
+          const s = SV[JUNG[this.jung]];
+          if (s) { this.jung = JUNG.indexOf(s[0]); this.out(this.ch()); }
+          else { this.jung = -1; this.st = 'cho'; this.out(this.ch()); }
+        } else if (this.st === 'cho') {
+          if (this.has) socket.emit('input', '\x7f');
+          this.has = false; this.st = 'empty'; this.cho = -1;
+          imeBar.textContent = ''; imeBar.classList.remove('active');
+        } else {
+          socket.emit('input', '\x7f');
+        }
+      },
+
+      feed(j) {
+        const ic = CHO.includes(j), iv = JUNG.includes(j);
+        if (!ic && !iv) return;
+
+        if (this.st === 'empty') {
+          if (ic) { this.cho = CHO.indexOf(j); this.st = 'cho'; this.out(this.ch()); }
+          else socket.emit('input', j);
+        } else if (this.st === 'cho') {
+          if (iv) { this.jung = JUNG.indexOf(j); this.st = 'jung'; this.out(this.ch()); }
+          else { this.commit(); this.cho = CHO.indexOf(j); this.st = 'cho'; this.out(this.ch()); }
+        } else if (this.st === 'jung') {
+          if (iv) {
+            const c = CV[JUNG[this.jung] + j];
+            if (c) { this.jung = JUNG.indexOf(c); this.out(this.ch()); }
+            else { this.commit(); socket.emit('input', j); }
+          } else {
+            const ji = JONG.indexOf(j);
+            if (ji > 0) { this.jong = ji; this.st = 'jong'; this.out(this.ch()); }
+            else { this.commit(); this.cho = CHO.indexOf(j); this.st = 'cho'; this.out(this.ch()); }
+          }
+        } else if (this.st === 'jong') {
+          if (ic) {
+            const c = CJ[JONG[this.jong] + j];
+            if (c) { this.jong = JONG.indexOf(c); this.out(this.ch()); }
+            else { this.commit(); this.cho = CHO.indexOf(j); this.st = 'cho'; this.out(this.ch()); }
+          } else {
+            const cur = JONG[this.jong], sp = SJ[cur];
+            if (sp) {
+              this.jong = JONG.indexOf(sp[0]); this.out(this.ch()); this.commit();
+              this.cho = CHO.indexOf(sp[1]); this.jung = JUNG.indexOf(j); this.st = 'jung'; this.out(this.ch());
+            } else {
+              this.jong = 0; this.out(this.ch()); this.commit();
+              this.cho = CHO.indexOf(cur); this.jung = JUNG.indexOf(j); this.st = 'jung'; this.out(this.ch());
+            }
+          }
+        }
+      }
+    };
+
     // Korean mode toggle
     let koreanMode = false;
 
     function toggleKoreanMode() {
+      if (koreanMode) ime.commit();
       koreanMode = !koreanMode;
-      if (koreanMode) {
-        // Switch to native soft keyboard for Korean
-        kbdDiv.classList.add('hidden');
-        if (xtermTextarea) {
-          xtermTextarea.removeAttribute('inputmode');
-          term.focus();
-        }
-      } else {
-        // Switch back to custom keyboard
-        kbdDiv.classList.remove('hidden');
-        if (xtermTextarea) {
-          xtermTextarea.setAttribute('inputmode', 'none');
-          xtermTextarea.blur();
-        }
-        setTimeout(() => fitAddon.fit(), 100);
-      }
-      // Update button highlight
+      updateKeyLabels();
       kbdDiv.querySelectorAll('.kbd-key').forEach((btn) => {
         if (btn.dataset.seq === '__hangul__') btn.classList.toggle('active', koreanMode);
       });
     }
 
     // Blur textarea initially to prevent IME
-    if (xtermTextarea) {
-      xtermTextarea.blur();
-    }
+    if (xtermTextarea) xtermTextarea.blur();
 
     function updateKeyLabels() {
       kbdDiv.querySelectorAll('.kbd-key:not(.kbd-fn-key)').forEach((btn) => {
@@ -590,8 +680,16 @@
         if (seq && seq.startsWith('__')) return;
         if (fnActive && btn.dataset.fn) {
           btn.textContent = btn.dataset.fn;
+          return;
+        }
+        const base = btn.dataset.label;
+        if (koreanMode && base.length === 1 && base >= 'a' && base <= 'z') {
+          const ko = shiftActive
+            ? (KO[base.toUpperCase()] || KO[base])
+            : KO[base];
+          btn.textContent = ko || (shiftActive ? btn.dataset.shift : base);
         } else {
-          btn.textContent = shiftActive ? btn.dataset.shift : btn.dataset.label;
+          btn.textContent = shiftActive ? btn.dataset.shift : base;
         }
       });
     }
@@ -608,159 +706,84 @@
 
     function sendKey(char) {
       let out = char;
-
       if (ctrlSticky && char.length === 1 && char >= 'a' && char <= 'z') {
-        out = String.fromCharCode(char.charCodeAt(0) - 96);
-        ctrlSticky = false;
+        out = String.fromCharCode(char.charCodeAt(0) - 96); ctrlSticky = false;
       } else if (ctrlSticky && char.length === 1 && char >= 'A' && char <= 'Z') {
-        out = String.fromCharCode(char.charCodeAt(0) - 64);
-        ctrlSticky = false;
+        out = String.fromCharCode(char.charCodeAt(0) - 64); ctrlSticky = false;
       } else if (altSticky) {
-        out = '\x1b' + char;
-        altSticky = false;
+        out = '\x1b' + char; altSticky = false;
       }
-
       socket.emit('input', out);
       updateModifierUI();
+    }
+
+    // Unified key handler
+    function handleKeyPress(btn) {
+      const seq = btn.dataset.seq;
+
+      // Modifiers
+      if (seq === '__shift__') { shiftActive = !shiftActive; updateKeyLabels(); updateModifierUI(); return; }
+      if (seq === '__ctrl__') { ctrlSticky = !ctrlSticky; updateModifierUI(); return; }
+      if (seq === '__alt__') { altSticky = !altSticky; updateModifierUI(); return; }
+      if (seq === '__fn__') { fnActive = !fnActive; updateKeyLabels(); updateModifierUI(); return; }
+      if (seq === '__meta__') return;
+      if (seq === '__hangul__') { toggleKoreanMode(); return; }
+
+      // Fn layer
+      if (fnActive && btn.dataset.fn) {
+        const f = fnKeyMap[btn.dataset.fn];
+        if (f) { if (koreanMode) ime.commit(); socket.emit('input', f); fnActive = false; updateKeyLabels(); updateModifierUI(); }
+        return;
+      }
+
+      // Backspace in Korean mode
+      if (koreanMode && seq === '\x7f') { ime.bksp(); return; }
+
+      // Fixed sequence keys — commit Korean first
+      if (seq) {
+        if (koreanMode) ime.commit();
+        sendKey(seq);
+        return;
+      }
+
+      // Character keys
+      const base = btn.dataset.label;
+      if (koreanMode && base.length === 1 && base >= 'a' && base <= 'z' && !ctrlSticky && !altSticky) {
+        const lookup = shiftActive ? (KO[base.toUpperCase()] || KO[base]) : KO[base];
+        if (lookup) {
+          ime.feed(lookup);
+          if (shiftActive) { shiftActive = false; updateKeyLabels(); updateModifierUI(); }
+          return;
+        }
+      }
+
+      // Normal character
+      if (koreanMode) ime.commit();
+      const ch = shiftActive ? btn.dataset.shift : base;
+      if (ch.length === 1) {
+        sendKey(ch);
+        if (shiftActive) { shiftActive = false; updateKeyLabels(); updateModifierUI(); }
+      }
     }
 
     // Prevent focus loss on keyboard tap
     kbdDiv.addEventListener('mousedown', (e) => e.preventDefault());
     kbdDiv.addEventListener('touchstart', (e) => {
-      // Allow scrolling but prevent focus loss
-      if (e.target.closest('.kbd-key')) {
-        e.preventDefault();
-      }
+      if (e.target.closest('.kbd-key')) e.preventDefault();
     });
 
     kbdDiv.addEventListener('touchend', (e) => {
       const btn = e.target.closest('.kbd-key');
       if (!btn) return;
       e.preventDefault();
-
-      const seq = btn.dataset.seq;
-
-      // Modifiers
-      if (seq === '__shift__') {
-        shiftActive = !shiftActive;
-        updateKeyLabels();
-        updateModifierUI();
-        return;
-      }
-      if (seq === '__ctrl__') {
-        ctrlSticky = !ctrlSticky;
-        updateModifierUI();
-        return;
-      }
-      if (seq === '__alt__') {
-        altSticky = !altSticky;
-        updateModifierUI();
-        return;
-      }
-      if (seq === '__fn__') {
-        fnActive = !fnActive;
-        updateKeyLabels();
-        updateModifierUI();
-        return;
-      }
-      if (seq === '__meta__') return;
-      if (seq === '__hangul__') {
-        toggleKoreanMode();
-        return;
-      }
-
-      // Fn layer
-      if (fnActive && btn.dataset.fn) {
-        const fnSeq = fnKeyMap[btn.dataset.fn];
-        if (fnSeq) {
-          socket.emit('input', fnSeq);
-          fnActive = false;
-          updateKeyLabels();
-          updateModifierUI();
-        }
-        return;
-      }
-
-      // Fixed sequence keys (Esc, Tab, Enter, BS, Del, arrows, shortcuts)
-      if (seq) {
-        sendKey(seq);
-        return;
-      }
-
-      // Character keys
-      const ch = shiftActive ? btn.dataset.shift : btn.dataset.label;
-      if (ch.length === 1) {
-        sendKey(ch);
-        if (shiftActive) {
-          shiftActive = false;
-          updateKeyLabels();
-          updateModifierUI();
-        }
-      }
+      handleKeyPress(btn);
     });
 
-    // Also handle click for desktop PWA testing
     kbdDiv.addEventListener('click', (e) => {
       const btn = e.target.closest('.kbd-key');
       if (!btn) return;
-      // On touch devices, touchend already handled it
       if (e.sourceCapabilities && e.sourceCapabilities.firesTouchEvents) return;
-
-      const seq = btn.dataset.seq;
-
-      if (seq === '__shift__') {
-        shiftActive = !shiftActive;
-        updateKeyLabels();
-        updateModifierUI();
-        return;
-      }
-      if (seq === '__ctrl__') {
-        ctrlSticky = !ctrlSticky;
-        updateModifierUI();
-        return;
-      }
-      if (seq === '__alt__') {
-        altSticky = !altSticky;
-        updateModifierUI();
-        return;
-      }
-      if (seq === '__fn__') {
-        fnActive = !fnActive;
-        updateKeyLabels();
-        updateModifierUI();
-        return;
-      }
-      if (seq === '__meta__') return;
-      if (seq === '__hangul__') {
-        toggleKoreanMode();
-        return;
-      }
-
-      if (fnActive && btn.dataset.fn) {
-        const fnSeq = fnKeyMap[btn.dataset.fn];
-        if (fnSeq) {
-          socket.emit('input', fnSeq);
-          fnActive = false;
-          updateKeyLabels();
-          updateModifierUI();
-        }
-        return;
-      }
-
-      if (seq) {
-        sendKey(seq);
-        return;
-      }
-
-      const ch = shiftActive ? btn.dataset.shift : btn.dataset.label;
-      if (ch.length === 1) {
-        sendKey(ch);
-        if (shiftActive) {
-          shiftActive = false;
-          updateKeyLabels();
-          updateModifierUI();
-        }
-      }
+      handleKeyPress(btn);
     });
 
     // Re-fit terminal with keyboard visible
