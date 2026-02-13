@@ -575,8 +575,7 @@
     kbdDiv.insertBefore(imeBar, kbdDiv.firstChild);
 
     const ime = {
-      cho: -1, jung: -1, jong: 0,
-      st: 'empty', has: false,
+      cho: -1, jung: -1, jong: 0, st: 'empty',
 
       ch() {
         if (this.cho >= 0 && this.jung >= 0)
@@ -585,35 +584,34 @@
         return '';
       },
 
-      out(c) {
-        if (this.has) socket.emit('input', '\x7f' + c);
-        else socket.emit('input', c);
-        this.has = !!c;
+      show() {
+        const c = this.ch();
         imeBar.textContent = c;
         imeBar.classList.toggle('active', !!c);
       },
 
-      commit() {
-        if (this.st !== 'empty') {
-          this.has = false; this.st = 'empty';
-          this.cho = -1; this.jung = -1; this.jong = 0;
-          imeBar.textContent = ''; imeBar.classList.remove('active');
-        }
+      flush() {
+        const c = this.ch();
+        if (c) socket.emit('input', c);
+        this.cho = -1; this.jung = -1; this.jong = 0; this.st = 'empty';
+        imeBar.textContent = ''; imeBar.classList.remove('active');
       },
+
+      commit() { if (this.st !== 'empty') this.flush(); },
 
       bksp() {
         if (this.st === 'jong') {
           const s = SJ[JONG[this.jong]];
-          if (s) { this.jong = JONG.indexOf(s[0]); }
+          if (s) this.jong = JONG.indexOf(s[0]);
           else { this.jong = 0; this.st = 'jung'; }
-          this.out(this.ch());
+          this.show();
         } else if (this.st === 'jung') {
           const s = SV[JUNG[this.jung]];
-          if (s) { this.jung = JUNG.indexOf(s[0]); this.out(this.ch()); }
-          else { this.jung = -1; this.st = 'cho'; this.out(this.ch()); }
+          if (s) { this.jung = JUNG.indexOf(s[0]); }
+          else { this.jung = -1; this.st = 'cho'; }
+          this.show();
         } else if (this.st === 'cho') {
-          if (this.has) socket.emit('input', '\x7f');
-          this.has = false; this.st = 'empty'; this.cho = -1;
+          this.cho = -1; this.st = 'empty';
           imeBar.textContent = ''; imeBar.classList.remove('active');
         } else {
           socket.emit('input', '\x7f');
@@ -625,34 +623,41 @@
         if (!ic && !iv) return;
 
         if (this.st === 'empty') {
-          if (ic) { this.cho = CHO.indexOf(j); this.st = 'cho'; this.out(this.ch()); }
+          if (ic) { this.cho = CHO.indexOf(j); this.st = 'cho'; this.show(); }
           else socket.emit('input', j);
         } else if (this.st === 'cho') {
-          if (iv) { this.jung = JUNG.indexOf(j); this.st = 'jung'; this.out(this.ch()); }
-          else { this.commit(); this.cho = CHO.indexOf(j); this.st = 'cho'; this.out(this.ch()); }
+          if (iv) { this.jung = JUNG.indexOf(j); this.st = 'jung'; this.show(); }
+          else { this.flush(); this.cho = CHO.indexOf(j); this.st = 'cho'; this.show(); }
         } else if (this.st === 'jung') {
           if (iv) {
             const c = CV[JUNG[this.jung] + j];
-            if (c) { this.jung = JUNG.indexOf(c); this.out(this.ch()); }
-            else { this.commit(); socket.emit('input', j); }
+            if (c) { this.jung = JUNG.indexOf(c); this.show(); }
+            else { this.flush(); socket.emit('input', j); }
           } else {
             const ji = JONG.indexOf(j);
-            if (ji > 0) { this.jong = ji; this.st = 'jong'; this.out(this.ch()); }
-            else { this.commit(); this.cho = CHO.indexOf(j); this.st = 'cho'; this.out(this.ch()); }
+            if (ji > 0) { this.jong = ji; this.st = 'jong'; this.show(); }
+            else { this.flush(); this.cho = CHO.indexOf(j); this.st = 'cho'; this.show(); }
           }
         } else if (this.st === 'jong') {
           if (ic) {
             const c = CJ[JONG[this.jong] + j];
-            if (c) { this.jong = JONG.indexOf(c); this.out(this.ch()); }
-            else { this.commit(); this.cho = CHO.indexOf(j); this.st = 'cho'; this.out(this.ch()); }
+            if (c) { this.jong = JONG.indexOf(c); this.show(); }
+            else { this.flush(); this.cho = CHO.indexOf(j); this.st = 'cho'; this.show(); }
           } else {
+            // 받침이동: vowel after jong
             const cur = JONG[this.jong], sp = SJ[cur];
             if (sp) {
-              this.jong = JONG.indexOf(sp[0]); this.out(this.ch()); this.commit();
-              this.cho = CHO.indexOf(sp[1]); this.jung = JUNG.indexOf(j); this.st = 'jung'; this.out(this.ch());
+              this.jong = JONG.indexOf(sp[0]);
+              const commitChar = this.ch();
+              socket.emit('input', commitChar);
+              this.cho = CHO.indexOf(sp[1]); this.jung = JUNG.indexOf(j);
+              this.jong = 0; this.st = 'jung'; this.show();
             } else {
-              this.jong = 0; this.out(this.ch()); this.commit();
-              this.cho = CHO.indexOf(cur); this.jung = JUNG.indexOf(j); this.st = 'jung'; this.out(this.ch());
+              this.jong = 0;
+              const commitChar = this.ch();
+              socket.emit('input', commitChar);
+              this.cho = CHO.indexOf(cur); this.jung = JUNG.indexOf(j);
+              this.jong = 0; this.st = 'jung'; this.show();
             }
           }
         }
