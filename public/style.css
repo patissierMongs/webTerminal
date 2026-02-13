@@ -93,6 +93,145 @@ body {
   padding: 2px;
 }
 
+/* Drawer */
+.drawer-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 300;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease;
+}
+
+.drawer-backdrop.open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 300px;
+  background: var(--bar-bg);
+  z-index: 310;
+  transform: translateX(100%);
+  transition: transform 0.25s ease;
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid var(--accent);
+}
+
+.drawer.open {
+  transform: translateX(0);
+}
+
+.drawer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--accent);
+  flex-shrink: 0;
+  gap: 8px;
+}
+
+.drawer-header span {
+  flex: 1;
+  font-weight: bold;
+  font-size: 14px;
+}
+
+.drawer-header button {
+  background: none;
+  border: none;
+  color: var(--text);
+  font-size: 20px;
+  cursor: pointer;
+  padding: 2px 6px;
+  line-height: 1;
+  border-radius: 4px;
+}
+
+.drawer-header button:active {
+  background: rgba(255,255,255,0.1);
+}
+
+.drawer-back {
+  font-size: 16px !important;
+}
+
+.drawer-content {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  padding: 8px;
+}
+
+.drawer-menu-item {
+  padding: 12px;
+  margin: 4px 0;
+  background: rgba(255,255,255,0.05);
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background 0.15s;
+}
+
+.drawer-menu-item:active {
+  background: rgba(79, 204, 163, 0.2);
+}
+
+.drawer-content pre {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.drawer-content .log-item,
+.drawer-content .summary-item {
+  padding: 10px 12px;
+  margin: 4px 0;
+  background: rgba(255,255,255,0.05);
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  transition: background 0.15s;
+}
+
+.drawer-content .log-item:active,
+.drawer-content .summary-item:active {
+  background: rgba(79, 204, 163, 0.2);
+}
+
+.drawer-content .btn-generate {
+  display: block;
+  width: 100%;
+  margin-bottom: 12px;
+  padding: 10px;
+  background: var(--accent);
+  border: 1px solid rgba(255,255,255,0.1);
+  color: var(--text);
+  border-radius: 6px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.drawer-content .btn-generate:active {
+  background: var(--green);
+  color: #111;
+}
+
+@media (max-width: 600px) {
+  .drawer { width: 85vw; }
+}
+
 /* Toast */
 .toast {
   position: fixed;

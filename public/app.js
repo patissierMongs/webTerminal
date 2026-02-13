@@ -152,8 +152,180 @@
     return div.innerHTML;
   }
 
-  // Export for drawer (Commit 4)
-  window.__openclaw = { term, socket, fitAddon, escapeHtml, showToast, doResize, deviceType, isPWA };
+  // --- Drawer ---
+  const drawerEl = document.getElementById('drawer');
+  const drawerBackdrop = document.getElementById('drawer-backdrop');
+  const drawerTitle = document.getElementById('drawer-title');
+  const drawerContent = document.getElementById('drawer-content');
+  const drawerClose = document.getElementById('drawer-close');
+  const drawerBack = document.getElementById('drawer-back');
+  const drawerHistory = [];
+
+  function openDrawer() {
+    drawerHistory.length = 0;
+    drawerBack.style.display = 'none';
+    showDrawerMenu();
+    drawerEl.classList.add('open');
+    drawerBackdrop.classList.add('open');
+  }
+
+  function closeDrawer() {
+    drawerEl.classList.remove('open');
+    drawerBackdrop.classList.remove('open');
+    drawerHistory.length = 0;
+    term.focus();
+  }
+
+  function showDrawerContent(title, html, pushHistory) {
+    if (pushHistory) {
+      drawerHistory.push({ title: drawerTitle.textContent, html: drawerContent.innerHTML });
+      drawerBack.style.display = '';
+    }
+    drawerTitle.textContent = title;
+    drawerContent.innerHTML = html;
+    drawerContent.scrollTop = 0;
+  }
+
+  function drawerGoBack() {
+    const prev = drawerHistory.pop();
+    if (prev) {
+      drawerTitle.textContent = prev.title;
+      drawerContent.innerHTML = prev.html;
+      if (drawerHistory.length === 0) drawerBack.style.display = 'none';
+    }
+  }
+
+  function showDrawerMenu() {
+    drawerTitle.textContent = 'Menu';
+    drawerContent.innerHTML = [
+      '<div class="drawer-menu-item" data-action="summaries">Summary</div>',
+      '<div class="drawer-menu-item" data-action="logs">Logs</div>',
+      '<div class="drawer-menu-item" data-action="reload">Reload</div>',
+    ].join('');
+  }
+
+  // Drawer trigger
+  document.getElementById('btn-drawer').addEventListener('click', openDrawer);
+  drawerClose.addEventListener('click', closeDrawer);
+  drawerBackdrop.addEventListener('click', closeDrawer);
+  drawerBack.addEventListener('click', drawerGoBack);
+
+  // ESC to close drawer
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && drawerEl.classList.contains('open')) {
+      closeDrawer();
+    }
+  });
+
+  // Swipe right to close drawer
+  let swipeStartX = 0;
+  drawerEl.addEventListener('touchstart', (e) => {
+    swipeStartX = e.touches[0].clientX;
+  }, { passive: true });
+
+  drawerEl.addEventListener('touchend', (e) => {
+    const dx = e.changedTouches[0].clientX - swipeStartX;
+    if (dx > 60) closeDrawer();
+  }, { passive: true });
+
+  // Drawer menu actions (event delegation)
+  drawerContent.addEventListener('click', async (e) => {
+    const menuItem = e.target.closest('.drawer-menu-item');
+    if (menuItem) {
+      const action = menuItem.dataset.action;
+      if (action === 'summaries') showSummaries();
+      else if (action === 'logs') showLogs();
+      else if (action === 'reload') location.reload(true);
+      return;
+    }
+
+    const logItem = e.target.closest('.log-item');
+    if (logItem) {
+      const file = logItem.dataset.file;
+      showDrawerContent(file, '<div class="loading">Loading...</div>', true);
+      try {
+        const r = await fetch(`/api/logs/${encodeURIComponent(file)}`);
+        const text = await r.text();
+        drawerContent.innerHTML = `<pre>${escapeHtml(text.slice(-8000))}</pre>`;
+      } catch (err) {
+        drawerContent.innerHTML = `<div class="loading">Error: ${err.message}</div>`;
+      }
+      return;
+    }
+
+    const summaryItem = e.target.closest('.summary-item');
+    if (summaryItem) {
+      const file = summaryItem.dataset.file;
+      showDrawerContent(file, '<div class="loading">Loading...</div>', true);
+      try {
+        const r = await fetch(`/api/summaries/${encodeURIComponent(file)}`);
+        const text = await r.text();
+        drawerContent.innerHTML = `<pre>${escapeHtml(text)}</pre>`;
+      } catch (err) {
+        drawerContent.innerHTML = `<div class="loading">Error: ${err.message}</div>`;
+      }
+      return;
+    }
+
+    const genBtn = e.target.closest('.btn-generate');
+    if (genBtn) {
+      showDrawerContent('Summarizing...', '<div class="loading">Sending to Ollama...</div>', true);
+      try {
+        const r = await fetch('/api/summarize', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({}),
+        });
+        if (!r.ok) {
+          const err = await r.json();
+          throw new Error(err.error || 'Unknown error');
+        }
+        const result = await r.json();
+        drawerContent.innerHTML = `<pre>${escapeHtml(result.summary)}</pre>`;
+        drawerTitle.textContent = 'Summary';
+      } catch (err) {
+        drawerContent.innerHTML = `<div class="loading">${escapeHtml(err.message)}</div>`;
+        drawerTitle.textContent = 'Error';
+      }
+    }
+  });
+
+  async function showLogs() {
+    showDrawerContent('Logs', '<div class="loading">Loading...</div>', true);
+    try {
+      const res = await fetch('/api/logs');
+      const files = await res.json();
+      if (files.length === 0) {
+        drawerContent.innerHTML = '<div class="loading">No logs yet</div>';
+        return;
+      }
+      drawerContent.innerHTML = files
+        .map((f) => `<div class="log-item" data-file="${f}">${f}</div>`)
+        .join('');
+    } catch (err) {
+      drawerContent.innerHTML = `<div class="loading">Error: ${err.message}</div>`;
+    }
+  }
+
+  async function showSummaries() {
+    showDrawerContent('Summaries', '<div class="loading">Loading...</div>', true);
+    try {
+      const res = await fetch('/api/summaries');
+      const files = await res.json();
+
+      let html = '<button class="btn-generate">Generate New Summary</button>';
+      if (files.length > 0) {
+        html += files
+          .map((f) => `<div class="summary-item" data-file="${f}">${f}</div>`)
+          .join('');
+      } else {
+        html += '<div style="color:#888;margin-top:8px">No summaries yet</div>';
+      }
+      drawerContent.innerHTML = html;
+    } catch (err) {
+      drawerContent.innerHTML = `<div class="loading">Error: ${err.message}</div>`;
+    }
+  }
 
   // --- PWA Service Worker ---
   if ('serviceWorker' in navigator) {
