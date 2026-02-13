@@ -24,6 +24,7 @@
     </div>
     <div class="sb-right">
       <span id="client-count-wrap"><span id="client-count">0</span></span>
+      <button id="btn-expand" aria-label="Ollama" title="Ollama Stream">&#9650;</button>
       <button id="btn-drawer" aria-label="Menu">&#9776;</button>
     </div>
   </div>
@@ -40,6 +41,18 @@
       <button id="drawer-close">&times;</button>
     </div>
     <div id="drawer-content" class="drawer-content"></div>
+  </div>
+
+  <div id="expand-panel" class="expand-panel">
+    <div class="expand-header">
+      <span id="expand-title">Ollama</span>
+      <div class="expand-actions">
+        <button id="expand-run" title="Run Summary">Run</button>
+        <button id="expand-clear" title="Clear">Clear</button>
+        <button id="expand-close">&times;</button>
+      </div>
+    </div>
+    <pre id="expand-output" class="expand-output"></pre>
   </div>
 
   <div id="alert-toast" class="toast hidden"></div>

@@ -95,6 +95,19 @@ io.on('connection', (socket) => {
     terminal.write(data);
   });
 
+  socket.on('ollama-summarize', async ({ filename } = {}) => {
+    const target = filename || `${new Date().toISOString().slice(0, 10)}-plain.log`;
+    try {
+      socket.emit('ollama-start', { target });
+      await summarizer.streamSummarize(target, (chunk) => {
+        socket.emit('ollama-chunk', chunk);
+      });
+      socket.emit('ollama-done');
+    } catch (err) {
+      socket.emit('ollama-error', err.message);
+    }
+  });
+
   socket.on('resize', ({ cols, rows }) => {
     terminal.resizeIfAllowed(socket, cols, rows);
   });

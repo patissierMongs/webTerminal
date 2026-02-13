@@ -327,6 +327,67 @@
     }
   }
 
+  // --- Expand Panel (Ollama Stream) ---
+  const expandPanel = document.getElementById('expand-panel');
+  const expandOutput = document.getElementById('expand-output');
+  const expandTitle = document.getElementById('expand-title');
+  const btnExpand = document.getElementById('btn-expand');
+  let ollamaStreaming = false;
+
+  function openExpand() {
+    expandPanel.classList.add('open');
+    btnExpand.textContent = '\u25BC'; // down arrow when open
+  }
+
+  function closeExpand() {
+    expandPanel.classList.remove('open');
+    btnExpand.textContent = '\u25B2'; // up arrow when closed
+    term.focus();
+  }
+
+  btnExpand.addEventListener('click', () => {
+    if (expandPanel.classList.contains('open')) closeExpand();
+    else openExpand();
+  });
+
+  document.getElementById('expand-close').addEventListener('click', closeExpand);
+
+  document.getElementById('expand-clear').addEventListener('click', () => {
+    expandOutput.textContent = '';
+  });
+
+  document.getElementById('expand-run').addEventListener('click', () => {
+    if (ollamaStreaming) return;
+    expandOutput.textContent = '';
+    socket.emit('ollama-summarize', {});
+  });
+
+  socket.on('ollama-start', ({ target }) => {
+    ollamaStreaming = true;
+    btnExpand.classList.add('streaming');
+    expandTitle.textContent = `Ollama: ${target}`;
+    expandOutput.textContent = '';
+    openExpand();
+  });
+
+  socket.on('ollama-chunk', (chunk) => {
+    expandOutput.textContent += chunk;
+    expandOutput.scrollTop = expandOutput.scrollHeight;
+  });
+
+  socket.on('ollama-done', () => {
+    ollamaStreaming = false;
+    btnExpand.classList.remove('streaming');
+    expandTitle.textContent = 'Ollama (done)';
+  });
+
+  socket.on('ollama-error', (msg) => {
+    ollamaStreaming = false;
+    btnExpand.classList.remove('streaming');
+    expandTitle.textContent = 'Ollama (error)';
+    expandOutput.textContent += `\n[Error] ${msg}`;
+  });
+
   // --- Custom Keyboard (PWA only) ---
   if (isPWA()) {
     // Block soft keyboard, keep physical keyboard working
