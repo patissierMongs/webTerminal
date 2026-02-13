@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#1a1a2e">
+  <title>OpenClaw Terminal</title>
+  <link rel="manifest" href="/manifest.json">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/css/xterm.min.css">
+  <link rel="stylesheet" href="/fonts/nerd-font.css">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header id="header">
+    <div class="status">
+      <span id="status-dot" class="dot disconnected"></span>
+      <span id="status-text">Connecting...</span>
+    </div>
+    <div class="actions">
+      <button id="btn-summarize" title="Summarize">Summary</button>
+      <button id="btn-logs" title="Logs">Logs</button>
+      <button id="btn-reload" title="Reload" onclick="location.reload(true)">Reload</button>
+    </div>
+  </header>
+
+  <div id="terminal-container"></div>
+
+  <div id="modal-overlay" class="modal-overlay hidden">
+    <div id="modal" class="modal">
+      <div class="modal-header">
+        <span id="modal-title">Panel</span>
+        <button id="modal-close">&times;</button>
+      </div>
+      <div id="modal-content" class="modal-content"></div>
+    </div>
+  </div>
+
+  <div id="alert-toast" class="toast hidden"></div>
+
+  <div id="monitor" class="monitor">
+    <span id="mon-cpu" title="CPU">CPU --%</span>
+    <span id="mon-gpu" title="GPU">GPU --%</span>
+    <span id="mon-net" title="Network">NET --%</span>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/lib/xterm.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@xterm/addon-fit@0.10.0/lib/addon-fit.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@xterm/addon-web-links@0.11.0/lib/addon-web-links.min.js"></script>
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/app.js"></script>
+</body>
+</html>
