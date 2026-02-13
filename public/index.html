@@ -4,8 +4,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="theme-color" content="#1a1a2e">
+  <meta name="theme-color" content="#0d0f1a">
   <title>OpenClaw Terminal</title>
   <link rel="manifest" href="/manifest.json">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/css/xterm.min.css">
@@ -13,29 +14,21 @@
   <link rel="stylesheet" href="/style.css">
 </head>
 <body>
-  <header id="header">
-    <div class="status">
+  <div id="status-bar">
+    <div class="sb-left">
       <span id="status-dot" class="dot disconnected"></span>
       <span id="status-text">Connecting...</span>
     </div>
-    <div class="actions">
-      <button id="btn-summarize" title="Summarize">Summary</button>
-      <button id="btn-logs" title="Logs">Logs</button>
-      <button id="btn-reload" title="Reload" onclick="location.reload(true)">Reload</button>
+    <div class="sb-center">
+      <span id="clock"></span>
     </div>
-  </header>
-
-  <div id="terminal-container"></div>
-
-  <div id="modal-overlay" class="modal-overlay hidden">
-    <div id="modal" class="modal">
-      <div class="modal-header">
-        <span id="modal-title">Panel</span>
-        <button id="modal-close">&times;</button>
-      </div>
-      <div id="modal-content" class="modal-content"></div>
+    <div class="sb-right">
+      <span id="client-count-wrap"><span id="client-count">0</span></span>
+      <button id="btn-drawer" aria-label="Menu">&#9776;</button>
     </div>
   </div>
+
+  <div id="terminal-container"></div>
 
   <div id="alert-toast" class="toast hidden"></div>
 

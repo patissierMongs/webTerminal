@@ -23,6 +23,7 @@
       selectionBackground: '#0f346080',
     },
     allowProposedApi: true,
+    scrollSensitivity: 3,
   });
 
   const fitAddon = new FitAddon.FitAddon();
@@ -92,9 +93,6 @@
   });
 
   // --- Mobile Korean IME fix ---
-  // Disable Android keyboard autocomplete/prediction to reduce interference
-  // with xterm.js internal IME handling. Do NOT clear textarea — it breaks
-  // cross-syllable Korean composition (e.g. "안녕" becomes "안ㅕ").
   const xtermTextarea = term.textarea;
 
   if (xtermTextarea) {
@@ -105,7 +103,7 @@
     xtermTextarea.setAttribute('data-gramm', 'false');
   }
 
-  // Terminal input -> server (let xterm.js handle IME natively)
+  // Terminal input -> server
   term.onData((data) => {
     socket.emit('input', data);
   });
@@ -125,107 +123,14 @@
     setTimeout(doResize, 100);
   }
 
-  // --- Modal ---
-  const overlay = document.getElementById('modal-overlay');
-  const modalTitle = document.getElementById('modal-title');
-  const modalContent = document.getElementById('modal-content');
-  const modalClose = document.getElementById('modal-close');
-
-  function showModal(title, html) {
-    modalTitle.textContent = title;
-    modalContent.innerHTML = html;
-    modalContent.scrollTop = 0;
-    overlay.classList.remove('hidden');
+  // --- Clock ---
+  const clockEl = document.getElementById('clock');
+  function updateClock() {
+    const now = new Date();
+    clockEl.textContent = now.toTimeString().slice(0, 5);
   }
-
-  function hideModal() {
-    overlay.classList.add('hidden');
-  }
-
-  modalClose.addEventListener('click', hideModal);
-  overlay.addEventListener('click', (e) => {
-    if (!document.getElementById('modal').contains(e.target)) hideModal();
-  });
-
-  // --- Logs ---
-  document.getElementById('btn-logs').addEventListener('click', async () => {
-    showModal('Logs', '<div class="loading">Loading...</div>');
-    try {
-      const res = await fetch('/api/logs');
-      const files = await res.json();
-      if (files.length === 0) {
-        modalContent.innerHTML = '<div class="loading">No logs yet</div>';
-        return;
-      }
-      modalContent.innerHTML = files
-        .map((f) => `<div class="log-item" data-file="${f}">${f}</div>`)
-        .join('');
-
-      modalContent.querySelectorAll('.log-item').forEach((el) => {
-        el.addEventListener('click', async () => {
-          const file = el.dataset.file;
-          showModal(file, '<div class="loading">Loading...</div>');
-          const r = await fetch(`/api/logs/${encodeURIComponent(file)}`);
-          const text = await r.text();
-          modalContent.innerHTML = `<pre>${escapeHtml(text.slice(-8000))}</pre>`;
-        });
-      });
-    } catch (err) {
-      modalContent.innerHTML = `<div class="loading">Error: ${err.message}</div>`;
-    }
-  });
-
-  // --- Summarize ---
-  document.getElementById('btn-summarize').addEventListener('click', async () => {
-    showModal('Summaries', '<div class="loading">Loading...</div>');
-    try {
-      const res = await fetch('/api/summaries');
-      const files = await res.json();
-
-      let html = '<button class="btn-generate" id="btn-gen-summary">Generate New Summary</button>';
-
-      if (files.length > 0) {
-        html += files
-          .map((f) => `<div class="summary-item" data-file="${f}">${f}</div>`)
-          .join('');
-      } else {
-        html += '<div style="color:#888;margin-top:8px">No summaries yet</div>';
-      }
-
-      modalContent.innerHTML = html;
-
-      document.getElementById('btn-gen-summary').addEventListener('click', async () => {
-        showModal('Summarizing...', '<div class="loading">Sending to Ollama...</div>');
-        try {
-          const r = await fetch('/api/summarize', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({}),
-          });
-          if (!r.ok) {
-            const err = await r.json();
-            throw new Error(err.error || 'Unknown error');
-          }
-          const result = await r.json();
-          showModal('Summary', `<pre>${escapeHtml(result.summary)}</pre>`);
-        } catch (err) {
-          showModal('Error', `<div class="loading">${escapeHtml(err.message)}</div>`);
-        }
-      });
-
-      modalContent.querySelectorAll('.summary-item').forEach((el) => {
-        el.addEventListener('click', async () => {
-          const file = el.dataset.file;
-          showModal(file, '<div class="loading">Loading...</div>');
-          const r = await fetch(`/api/summaries/${encodeURIComponent(file)}`);
-          const text = await r.text();
-          modalContent.innerHTML = `<pre>${escapeHtml(text)}</pre>`;
-        });
-      });
-    } catch (err) {
-      modalContent.innerHTML = `<div class="loading">Error: ${err.message}</div>`;
-    }
-  });
+  updateClock();
+  setInterval(updateClock, 60000);
 
   // --- Toast ---
   const toastEl = document.getElementById('alert-toast');
@@ -246,6 +151,9 @@
     div.textContent = str;
     return div.innerHTML;
   }
+
+  // Export for drawer (Commit 4)
+  window.__openclaw = { term, socket, fitAddon, escapeHtml, showToast, doResize, deviceType, isPWA };
 
   // --- PWA Service Worker ---
   if ('serviceWorker' in navigator) {

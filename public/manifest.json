@@ -3,7 +3,7 @@
   "short_name": "Terminal",
   "description": "Remote web terminal for Claude Code CLI",
   "start_url": "/",
-  "display": "standalone",
+  "display": "fullscreen",
   "orientation": "any",
   "background_color": "#1a1a2e",
   "theme_color": "#1a1a2e",
