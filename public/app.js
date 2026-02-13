@@ -56,11 +56,8 @@
     socket.emit('register', { deviceType });
   });
 
-  socket.on('pty-dimensions', ({ cols, rows }) => {
-    if (deviceType === 'pwa') {
-      term.resize(cols, rows);
-      fitAddon.fit();
-    }
+  socket.on('pty-dimensions', () => {
+    // Server sent PTY size; local terminal fits its own container
   });
 
   socket.on('client-count', (count) => {
@@ -117,11 +114,9 @@
     }
   }
 
-  if (deviceType !== 'pwa') {
-    window.addEventListener('resize', doResize);
-    window.addEventListener('orientationchange', () => setTimeout(doResize, 200));
-    setTimeout(doResize, 100);
-  }
+  window.addEventListener('resize', doResize);
+  window.addEventListener('orientationchange', () => setTimeout(doResize, 200));
+  setTimeout(doResize, 100);
 
   // --- Clock ---
   const clockEl = document.getElementById('clock');
@@ -388,6 +383,22 @@
     expandOutput.textContent += `\n[Error] ${msg}`;
   });
 
+  // --- Scroll Buttons ---
+  function setupRepeatButton(btn, action) {
+    let interval;
+    const start = () => { action(); interval = setInterval(action, 120); };
+    const stop = () => clearInterval(interval);
+    btn.addEventListener('touchstart', (e) => { e.preventDefault(); start(); }, { passive: false });
+    btn.addEventListener('touchend', stop);
+    btn.addEventListener('touchcancel', stop);
+    btn.addEventListener('mousedown', (e) => { e.preventDefault(); start(); });
+    btn.addEventListener('mouseup', stop);
+    btn.addEventListener('mouseleave', stop);
+  }
+
+  setupRepeatButton(document.getElementById('scroll-up'), () => term.scrollPages(-1));
+  setupRepeatButton(document.getElementById('scroll-down'), () => term.scrollPages(1));
+
   // --- Custom Keyboard (PWA only) ---
   if (isPWA()) {
     // Block soft keyboard, keep physical keyboard working
@@ -502,7 +513,7 @@
       { label: 'Alt', shift: 'Alt', seq: '__alt__', fn: null },
       { label: '\u2318', shift: '\u2318', seq: '__meta__', fn: null },
       { label: '', shift: '', seq: ' ', cls: 'kbd-space', fn: null },
-      { label: '\u2318', shift: '\u2318', seq: '__meta__', fn: null },
+      { label: '한/영', shift: '한/영', seq: '__hangul__', fn: null },
       { label: 'Alt', shift: 'Alt', seq: '__alt__', fn: null },
       { label: 'Fn', shift: 'Fn', seq: '__fn__', fn: null },
     ];
@@ -540,6 +551,38 @@
     kbdDiv.appendChild(buildRow(row4, false));
     kbdDiv.appendChild(buildRow(row5, false));
     kbdContainer.appendChild(kbdDiv);
+
+    // Korean mode toggle
+    let koreanMode = false;
+
+    function toggleKoreanMode() {
+      koreanMode = !koreanMode;
+      if (koreanMode) {
+        // Switch to native soft keyboard for Korean
+        kbdDiv.classList.add('hidden');
+        if (xtermTextarea) {
+          xtermTextarea.removeAttribute('inputmode');
+          term.focus();
+        }
+      } else {
+        // Switch back to custom keyboard
+        kbdDiv.classList.remove('hidden');
+        if (xtermTextarea) {
+          xtermTextarea.setAttribute('inputmode', 'none');
+          xtermTextarea.blur();
+        }
+        setTimeout(() => fitAddon.fit(), 100);
+      }
+      // Update button highlight
+      kbdDiv.querySelectorAll('.kbd-key').forEach((btn) => {
+        if (btn.dataset.seq === '__hangul__') btn.classList.toggle('active', koreanMode);
+      });
+    }
+
+    // Blur textarea initially to prevent IME
+    if (xtermTextarea) {
+      xtermTextarea.blur();
+    }
 
     function updateKeyLabels() {
       kbdDiv.querySelectorAll('.kbd-key:not(.kbd-fn-key)').forEach((btn) => {
@@ -620,8 +663,10 @@
         updateModifierUI();
         return;
       }
-      if (seq === '__meta__') {
-        return; // Meta key not used in terminal
+      if (seq === '__meta__') return;
+      if (seq === '__hangul__') {
+        toggleKoreanMode();
+        return;
       }
 
       // Fn layer
@@ -652,8 +697,6 @@
           updateModifierUI();
         }
       }
-
-      term.focus();
     });
 
     // Also handle click for desktop PWA testing
@@ -688,6 +731,10 @@
         return;
       }
       if (seq === '__meta__') return;
+      if (seq === '__hangul__') {
+        toggleKoreanMode();
+        return;
+      }
 
       if (fnActive && btn.dataset.fn) {
         const fnSeq = fnKeyMap[btn.dataset.fn];
@@ -714,8 +761,6 @@
           updateModifierUI();
         }
       }
-
-      term.focus();
     });
 
     // Re-fit terminal with keyboard visible
@@ -761,6 +806,8 @@
   updateMonitor();
   setInterval(updateMonitor, 3000);
 
-  // Focus terminal on touch (mobile)
-  container.addEventListener('touchstart', () => term.focus(), { passive: true });
+  // Focus terminal on touch (mobile) — skip in PWA custom keyboard mode to prevent IME
+  container.addEventListener('touchstart', () => {
+    if (deviceType !== 'pwa') term.focus();
+  }, { passive: true });
 })();

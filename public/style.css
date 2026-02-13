@@ -373,6 +373,40 @@ body {
   white-space: nowrap;
 }
 
+/* Scroll Buttons (mobile) */
+.scroll-btns {
+  position: fixed;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: none;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 50;
+}
+
+.scroll-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: rgba(30, 34, 56, 0.7);
+  border: 1px solid var(--accent);
+  color: var(--text);
+  font-size: 12px;
+  cursor: pointer;
+  touch-action: manipulation;
+  opacity: 0.6;
+}
+
+.scroll-btn:active {
+  background: var(--accent);
+  opacity: 1;
+}
+
+@media (max-width: 600px) {
+  .scroll-btns { display: flex; }
+}
+
 /* Custom Keyboard (PWA only) */
 .mobile-kbd {
   display: flex;
