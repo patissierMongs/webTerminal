@@ -1,163 +1,110 @@
 # OpenClaw Web Terminal
 
-브라우저에서 tmux 세션에 접속할 수 있는 실시간 웹 터미널 애플리케이션.
-Claude Code CLI와 함께 사용하도록 설계되었으며, 세션 모니터링, 로깅, AI 요약 기능을 제공한다.
+브라우저와 휴대폰에서 tmux 세션에 접속해 Claude Code CLI(Command Line Interface) 작업을 이어서 할 수 있는 웹 터미널입니다.
+
+[English](README.en.md) | 한국어
+
+![브라우저에서 명령을 입력하는 모습](docs/images/terminal-typing.gif)
 
 ## 주요 기능
 
-- **웹 터미널** - xterm.js 기반 브라우저 터미널 (실시간 Socket.IO 통신)
-- **세션 로깅** - 일별 자동 로테이션, Plain/Raw 이중 로그 저장
-- **패턴 감시** - 권한 요청, 에러, 완료, 유휴 상태 자동 감지 및 알림
-- **Telegram 알림** - 에러/권한 프롬프트 발생 시 Telegram 메시지 전송
-- **AI 요약** - Ollama(로컬 LLM)를 활용한 세션 요약 생성
-- **시스템 모니터** - CPU, GPU(nvidia-smi), 네트워크 실시간 모니터링
-- **PWA 지원** - 모바일 홈 화면 추가, 오프라인 캐싱, Nerd Font 로컬 서빙
+- **웹 터미널**: xterm.js로 그린 터미널을 Socket.IO로 서버의 tmux 세션과 실시간으로 연결합니다. 여러 브라우저가 같은 세션을 함께 보고, 새로 접속하면 최근 출력(최대 100KB)을 다시 받아 옵니다.
+- **자동 재접속**: tmux 연결이 끊기면 2초 뒤 다시 붙고, 브라우저도 Socket.IO로 자동 재연결합니다.
+- **세션 로그**: 터미널 출력을 날짜별 파일로 `logs/`에 저장합니다. ANSI(American National Standards Institute) 색상 코드를 지운 `-plain.log`와 원본 그대로의 `-raw.log`를 함께 남깁니다.
+- **패턴 알림**: 출력에서 권한 요청(`Allow`, `(y/n)` 등), 오류(`Error:`, `command not found` 등), 완료(`Done`, `Success` 등) 문구를 찾아 화면 상단에 알림을 띄웁니다. 같은 종류는 30초에 한 번만 알립니다.
+- **Telegram 알림(선택)**: 오류와 권한 요청은 `openclaw` CLI를 통해 Telegram으로도 보냅니다.
+- **AI(Artificial Intelligence) 요약(선택)**: 로컬 Ollama 모델로 당일 로그를 한국어로 요약합니다. 상단 ▲ 버튼 패널에서 스트리밍으로 보거나, 메뉴의 Summary에서 생성하고 저장된 요약(`summaries/`)을 열어 봅니다.
+- **시스템 모니터**: 오른쪽 아래에 CPU(Central Processing Unit), GPU(Graphics Processing Unit, `nvidia-smi`가 있을 때만), 네트워크 사용량을 3초마다 표시합니다.
+- **PWA(Progressive Web App)**: 홈 화면에 추가하면 전체 화면으로 열리고, 정적 파일과 FiraCode Nerd Font를 캐시합니다.
+- **PWA 전용 키보드**: HHKB(Happy Hacking Keyboard) 배열 가상 키보드, `C-c`/`C-z` 같은 단축키 줄, 방향키, 고정(sticky) Ctrl/Alt, Fn 레이어(F1~F12, Home, PgDn 등), 두벌식 한글 입력(한/영 전환)을 제공합니다.
+- **크기 조정 우선순위**: PC(Personal Computer) 브라우저가 접속해 있으면 PWA 쪽의 터미널 크기 변경 요청은 무시해 PC 화면이 깨지지 않게 합니다.
 
-## 기술 스택
+| 로그 보기(오른쪽 서랍 메뉴) | PWA 전용 키보드와 한글 입력 |
+|---|---|
+| ![Logs 서랍](docs/images/drawer-logs.png) | <img src="docs/images/pwa-keyboard.gif" alt="PWA 키보드로 ls와 echo 한글 입력" width="300"> |
 
-| 구분 | 기술 |
-|------|------|
-| Backend | Node.js, Express, Socket.IO, node-pty |
-| Frontend | xterm.js v5.5.0, Vanilla JS, Service Worker |
-| Font | FiraCode Nerd Font (로컬 서빙, WOFF2) |
-| 외부 서비스 | tmux, Ollama (선택), Tailscale (선택), OpenClaw CLI (선택) |
+![명령 실행 후 오류 알림이 뜬 화면](docs/images/terminal-desktop.png)
 
-## 프로젝트 구조
+> 스크린샷은 이 저장소를 로컬에서 실제로 실행해 찍었습니다. 셸 프롬프트는 `demo@home-server`로 바꿨고, Ollama와 Telegram은 연결하지 않았습니다. PWA 화면은 브라우저의 `display-mode: fullscreen` 판정을 참으로 바꿔 PWA 모드 코드 경로를 띄운 것입니다.
 
-```
-newopenclaw/
-├── server.js              # Express/Socket.IO 메인 서버
-├── start.sh               # 사전 점검 및 서버 실행 스크립트
-├── package.json
-├── .env.example           # 환경변수 템플릿
-├── lib/
-│   ├── terminal.js        # PTY/tmux 브릿지 매니저
-│   ├── logger.js          # 세션 로깅 (Plain + Raw)
-│   ├── watcher.js         # 패턴 기반 알림 시스템
-│   ├── notifier.js        # Telegram 알림 발송
-│   ├── summarizer.js      # Ollama 기반 로그 요약
-│   └── monitor.js         # 시스템 모니터 (CPU/GPU/NET)
-├── public/
-│   ├── index.html         # SPA 메인 페이지
-│   ├── app.js             # 클라이언트 앱 로직
-│   ├── style.css          # 다크 테마 UI
-│   ├── manifest.json      # PWA 매니페스트
-│   ├── sw.js              # Service Worker (v2)
-│   ├── fonts/
-│   │   ├── nerd-font.css  # @font-face 선언
-│   │   ├── FiraCodeNerdFont-Regular.woff2
-│   │   └── FiraCodeNerdFont-Bold.woff2
-│   ├── icon-192.png
-│   └── icon-512.png
-├── logs/                  # 세션 로그 (자동 생성)
-└── summaries/             # AI 요약 파일 (자동 생성)
-```
+## 사용 방법
 
-## 요구 사항
+### 1. 준비
 
-- **Node.js** 18+
-- **tmux** (필수)
-- **Ollama** v0.16+ (선택 - AI 요약 기능 사용 시. Blackwell GPU는 v0.13+ 필수)
-- **Tailscale** (선택 - 원격 접속 시)
+- Node.js 18 이상, npm
+- tmux (필수)
+- node-pty 빌드 도구(`python3`, `make`, `g++`) — 미리 빌드된 바이너리가 없는 환경에서 필요합니다.
+- 선택: Ollama(AI 요약), `openclaw` CLI(Telegram 알림), `nvidia-smi`(GPU 표시), Tailscale(원격 접속)
 
-## 설치 및 실행
+### 2. 설치
 
 ```bash
-# 의존성 설치
+git clone https://github.com/patissierMongs/webTerminal.git
+cd webTerminal
 npm install
-
-# 환경변수 설정
 cp .env.example .env
-# .env 파일을 편집하여 필요한 값 입력
-
-# 실행 (start.sh 사용 - 권장)
-chmod +x start.sh
-./start.sh
-
-# 또는 직접 실행
-npm start
-
-# 개발 모드 (파일 변경 시 자동 재시작)
-npm run dev
 ```
 
-## 환경 변수
+`.env`에서 쓸 수 있는 값은 다음과 같습니다.
 
 | 변수 | 기본값 | 설명 |
 |------|--------|------|
-| `PORT` | `3030` | HTTP 서버 포트 |
-| `HOST` | `0.0.0.0` | HTTP 리슨 주소 |
-| `TMUX_SESSION` | `openclaw` | tmux 세션 이름 |
-| `TELEGRAM_CHAT_ID` | - | Telegram 수신자 ID |
-| `OLLAMA_URL` | `http://localhost:11434` | Ollama API 엔드포인트 |
-| `OLLAMA_MODEL` | `qwen3:30b-a3b` | 요약에 사용할 LLM 모델 (MoE) |
+| `PORT` | `3030` | HTTP(Hypertext Transfer Protocol) 포트 |
+| `HOST` | `0.0.0.0` | 리슨 주소 |
+| `TMUX_SESSION` | `openclaw` | 연결할 tmux 세션 이름(없으면 새로 만듭니다) |
+| `TELEGRAM_CHAT_ID` | (비어 있음) | Telegram 수신자 ID. 비어 있으면 알림을 보내지 않습니다 |
+| `OLLAMA_URL` | `http://localhost:11434` | Ollama API(Application Programming Interface) 주소 |
+| `OLLAMA_MODEL` | `qwen3:30b-a3b` | 요약에 쓸 모델 |
 
-## API
+### 3. 실행
+
+```bash
+./start.sh     # tmux/node 확인, logs·summaries 폴더와 tmux 세션 준비 후 서버 실행
+# 또는
+npm start      # node server.js
+npm run dev    # 파일이 바뀌면 자동 재시작(node --watch)
+```
+
+`start.sh`는 셸 환경 변수의 `TMUX_SESSION`만 읽고 `.env`는 읽지 않습니다. `.env`에서 세션 이름을 바꿨다면 서버가 그 이름으로 세션을 따로 만듭니다.
+
+### 4. 접속과 기본 사용
+
+1. 브라우저에서 `http://<서버 주소>:3030`을 엽니다. 상단 왼쪽 점이 초록색이고 `Connected`로 바뀌면 연결된 것입니다.
+2. 터미널을 클릭하고 평소처럼 명령을 입력합니다. 입력은 tmux 세션으로 그대로 전달됩니다.
+3. 상단 오른쪽 숫자는 현재 접속한 클라이언트 수입니다.
+4. ☰ 버튼을 누르면 오른쪽 서랍 메뉴가 열립니다.
+   - **Logs**: 날짜별 로그 목록을 보고, 파일을 누르면 마지막 8,000자를 보여 줍니다.
+   - **Summary**: `Generate New Summary`로 당일 로그를 요약하고, 저장된 요약을 엽니다(Ollama 필요).
+   - **Reload**: 페이지를 새로 불러옵니다(PWA에서 새로고침 대신 사용).
+5. ▲ 버튼은 Ollama 스트리밍 패널을 엽니다. `Run`을 누르면 요약이 생성되는 대로 표시됩니다.
+6. 휴대폰에서는 브라우저 메뉴의 "홈 화면에 추가"로 설치하면 전용 키보드와 스크롤 버튼(▲/▼)이 나타납니다.
+
+> **보안 주의**: 이 서버에는 로그인이나 토큰 인증이 없습니다. 접속할 수 있는 사람은 누구나 tmux 세션에서 명령을 실행할 수 있습니다. `HOST=127.0.0.1`로 묶거나 Tailscale 같은 사설 네트워크 안에서만 여세요. `start.sh`는 Tailscale이 설치되어 있으면 접속 주소를 출력합니다.
+
+### HTTP API
 
 | 메서드 | 경로 | 설명 |
 |--------|------|------|
-| `GET` | `/api/status` | 서버 상태 (tmux, PTY, 클라이언트 수, Ollama) |
+| `GET` | `/api/status` | tmux·PTY(pseudo-terminal) 상태, 클라이언트 수, Ollama 사용 가능 여부 |
 | `GET` | `/api/logs` | 로그 파일 목록 |
 | `GET` | `/api/logs/:filename` | 로그 파일 내용 |
-| `POST` | `/api/summarize` | AI 요약 생성 (Ollama 필요) |
+| `POST` | `/api/summarize` | 요약 생성(본문 `{ "filename": "..." }`, 생략하면 당일 plain 로그) |
 | `GET` | `/api/summaries` | 요약 파일 목록 |
 | `GET` | `/api/summaries/:filename` | 요약 파일 내용 |
-| `GET` | `/api/monitor` | 시스템 사용률 (CPU/GPU/NET) |
+| `GET` | `/api/monitor` | CPU/GPU/네트워크 사용량 |
 
-## Socket.IO 이벤트
+Socket.IO 이벤트는 클라이언트→서버 `input`, `resize`, `register`, `ollama-summarize`와 서버→클라이언트 `output`, `alert`, `client-count`, `pty-dimensions`, `pty-exit`, `ollama-start`/`ollama-chunk`/`ollama-done`/`ollama-error`가 있습니다(`server.js`).
 
-**Client → Server:**
-- `input` - 터미널 입력
-- `resize` - 터미널 크기 변경 `{ cols, rows }`
+## 기술 스택
 
-**Server → Client:**
-- `output` - 터미널 출력
-- `alert` - 알림 이벤트 `{ type, detail, timestamp }`
-- `pty-exit` - PTY 프로세스 종료 (자동 재접속)
-
-## 알림 패턴
-
-| 유형 | 감지 대상 |
+| 구분 | 사용 기술 |
 |------|-----------|
-| Permission | Allow, y/n, approve 등 권한 요청 프롬프트 |
-| Error | Error:, ENOENT, TypeError, panic 등 |
-| Completion | Done, Completed, Success 등 완료 메시지 |
-| Idle | 10초 이상 무활동 |
+| 언어 | JavaScript(Node.js 18 이상, 브라우저 Vanilla JS), Bash |
+| 서버 | Express `^4.21.2`, Socket.IO `^4.8.1`, node-pty `^1.0.0`, dotenv `^16.4.7`, strip-ansi `^7.1.0` |
+| 프런트엔드 | xterm.js `5.5.0`, `@xterm/addon-fit` `0.10.0`, `@xterm/addon-web-links` `0.11.0`(jsDelivr CDN(Content Delivery Network)), Service Worker, Web App Manifest |
+| 폰트 | FiraCode Nerd Font(WOFF2(Web Open Font Format 2), 로컬 제공) |
+| 외부 도구 | tmux(필수), Ollama·`openclaw` CLI·`nvidia-smi`·Tailscale(선택) |
 
----
+## 문서
 
-## 작업 이력
-
-### 2026-02-13 — 초기 세팅 및 최적화
-
-#### Nerd Font 로컬 서빙
-- CDN 의존 제거, `public/fonts/`에 FiraCode Nerd Font WOFF2 로컬 호스팅
-- `font-display: swap` 적용, Service Worker v2 프리캐시에 포함
-- Android 웹에서 tmux 글리프 깨짐 해결
-
-#### 시스템 모니터 (`lib/monitor.js`) 전면 수정
-- **CPU**: 부팅 이후 누적값 → 델타 기반 실시간 사용률로 변경
-- **GPU**: `nvidia-smi` 감지, 미사용 시 UI에서 자동 숨김
-- **NET**: 하드코딩 인터페이스(`eth0`) → 가장 트래픽 많은 인터페이스 자동 감지 (60초마다 재감지), 실제 속도(`KB/s`, `MB/s`) 표시
-- `execSync` 셸 파이프 → `fs.readFileSync('/proc/net/dev')` 직접 파싱으로 개선
-
-#### 한글 IME 입력 개선
-- xterm.js 내부 textarea에 `autocomplete/autocorrect/autocapitalize/spellcheck` off 설정
-- Android 키보드 자동완성/예측 간섭 최소화
-- 주의: textarea.value 초기화는 한글 교차 음절 조합을 깨뜨리므로 금지
-
-#### Ollama v0.9.4 → v0.16.1 업그레이드
-- **문제**: RTX 5090 (Blackwell, sm_120, CUDA 13)용 커널이 v0.9.4에 없어 GPU 감지만 하고 CPU 폴백
-- **증상**: `ollama ps` "100% GPU" 표시하지만 실제 GPU 사용률 0%, 6.57 t/s
-- **해결**: v0.16.1의 `cuda_v13` 라이브러리 포함 → 49/49 레이어 GPU 오프로드, Flash Attention 활성화
-- **결과**: 6.57 t/s → 237 t/s (36배 향상), 요약 생성 130초 → 7.7초
-
-#### UI 개선
-- Logs/Summary 패널: 하단 슬라이드업 → 센터 모달 팝업으로 변경
-- 모바일 터치 스크롤 최적화 (`-webkit-overflow-scrolling`, `overscroll-behavior`)
-- 배경 클릭으로 모달 닫기 지원
-- Reload 버튼 추가 (PWA에서 새로고침 불가 대응)
-
-#### 알려진 이슈
-- 한글 입력 시 Android 일부 키보드에서 이전 문장 반복 현상 잔존 가능 (xterm.js textarea 축적 문제)
-- WSL2 환경에서 `nvidia-smi` GPU 사용률이 0%로 보고되는 경우 있음 (실제로는 정상 작동)
+- [진행 기록](docs/PROGRESS.md) — 목표, 기능별 구현 상태, 작업 이력
